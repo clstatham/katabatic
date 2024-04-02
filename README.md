@@ -20,10 +20,10 @@ To build the project, navigate to the root directory of the project and run the 
 cargo build
 ```
 
-### License
+## License
 
 Apache-2.0 OR MIT (see [LICENSE-APACHE](LICENSE_APACHE) and [LICENSE-MIT](LICENSE-MIT))
 
-### Contributing
+## Contributing
 
 This project is open to pull requests and issues. Please feel free to open one if you would like to add anything! Katabatic is mainly a hobby project, but who knows, something might come of it. ;)
