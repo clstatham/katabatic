@@ -1,6 +1,10 @@
 use std::{
+    collections::VecDeque,
     ops::{Deref, DerefMut},
-    sync::{Arc, Weak},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Weak,
+    },
 };
 
 use parking_lot::*;
@@ -21,26 +25,12 @@ impl<T> Lock<T> {
         Read::try_new(self)
     }
 
-    pub fn read_defer<F>(&self, on_drop: F) -> DeferredRead<'_, T>
-    where
-        F: FnOnce(&Lock<T>) + 'static,
-    {
-        DeferredRead::new(self, on_drop)
-    }
-
     pub fn write(&self) -> Write<'_, T> {
         Write::new(self)
     }
 
     pub fn try_write(&self) -> Option<Write<'_, T>> {
         Write::try_new(self)
-    }
-
-    pub fn write_defer<F>(&self, on_drop: F) -> DeferredWrite<'_, T>
-    where
-        F: FnOnce(&Lock<T>) + 'static,
-    {
-        DeferredWrite::new(self, on_drop)
     }
 
     pub fn read_write(&self) -> ReadWrite<'_, T> {
@@ -181,91 +171,6 @@ impl<'a, T> DerefMut for Write<'a, T> {
     }
 }
 
-/// A read guard that runs a closure when dropped.
-/// Useful for deferring work until after the lock is released, especially work that requires write access to the lock.
-/// Warning: The lock is not guaranteed to be available for writing when the closure runs, since this uses a RwLock and not a Mutex.
-pub struct DeferredRead<'a, T> {
-    lock: &'a Lock<T>,
-    guard: Option<RwLockReadGuard<'a, T>>,
-    on_drop: Option<Box<dyn FnOnce(&'a Lock<T>) + 'static>>,
-}
-
-impl<'a, T> DeferredRead<'a, T> {
-    pub fn new<F>(lock: &'a Lock<T>, on_drop: F) -> Self
-    where
-        F: FnOnce(&'a Lock<T>) + 'static,
-    {
-        Self {
-            lock,
-            guard: Some(lock.0.read()),
-            on_drop: Some(Box::new(on_drop)),
-        }
-    }
-}
-
-impl<'a, T> Deref for DeferredRead<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.guard.as_ref().unwrap()
-    }
-}
-
-impl<'a, T> Drop for DeferredRead<'a, T> {
-    fn drop(&mut self) {
-        if let Some(guard) = self.guard.take() {
-            drop(guard);
-            if let Some(on_drop) = self.on_drop.take() {
-                on_drop(self.lock);
-            }
-        }
-    }
-}
-
-pub struct DeferredWrite<'a, T> {
-    lock: &'a Lock<T>,
-    guard: Option<RwLockWriteGuard<'a, T>>,
-    on_drop: Option<Box<dyn FnOnce(&'a Lock<T>) + 'static>>,
-}
-
-impl<'a, T> DeferredWrite<'a, T> {
-    pub fn new<F>(lock: &'a Lock<T>, on_drop: F) -> Self
-    where
-        F: FnOnce(&'a Lock<T>) + 'static,
-    {
-        Self {
-            lock,
-            guard: Some(lock.0.write()),
-            on_drop: Some(Box::new(on_drop)),
-        }
-    }
-}
-
-impl<'a, T> Deref for DeferredWrite<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.guard.as_ref().unwrap()
-    }
-}
-
-impl<'a, T> DerefMut for DeferredWrite<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.guard.as_mut().unwrap()
-    }
-}
-
-impl<'a, T> Drop for DeferredWrite<'a, T> {
-    fn drop(&mut self) {
-        if let Some(guard) = self.guard.take() {
-            drop(guard);
-            if let Some(on_drop) = self.on_drop.take() {
-                on_drop(self.lock);
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct MapRead<'a, T>(MappedRwLockReadGuard<'a, T>);
 
@@ -399,5 +304,132 @@ impl<T> Deref for SharedLock<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[derive(Debug)]
+pub enum DeferResult {
+    Completed,
+    /// The operation was deferred to no sooner than the next `defer()` call.
+    /// The contained [`AtomicBool`] will flip to `true` when the operation is completed.
+    Deferred(Arc<AtomicBool>),
+}
+
+impl DeferResult {
+    pub fn check_completed(&mut self) -> bool {
+        match self {
+            DeferResult::Completed => true,
+            DeferResult::Deferred(listener) => {
+                if listener.load(Ordering::Acquire) {
+                    *self = DeferResult::Completed;
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
+pub type DeferredFn<T> = Box<dyn FnOnce(&mut T)>;
+
+#[derive(Clone)]
+pub struct DeferLock<T: ?Sized> {
+    lock: SharedLock<T>,
+    queue: SharedLock<VecDeque<(DeferredFn<T>, Arc<AtomicBool>)>>,
+}
+
+impl<T> DeferLock<T> {
+    pub fn new(value: T) -> Self {
+        Self {
+            lock: SharedLock::new(value),
+            queue: SharedLock::new(VecDeque::new()),
+        }
+    }
+
+    pub fn read(&self) -> Read<T> {
+        self.lock.read()
+    }
+
+    /// Attempts to obtain a write lock on the inner `T`.
+    ///
+    /// If a write lock can NOT be obtained at this moment, `when_writable` will be pushed to a FIFO queue
+    /// of operations to perform the next time `defer()` is called and the lock is writable.
+    ///
+    /// If a write lock CAN be obtained at this moment, the aforementioned queue is first flushed
+    /// (applying all queued operations), then the operation defined by `when_writable` is performed.
+    ///
+    /// # Returns
+    ///
+    /// Returns [`DeferResult::Completed`] on successful write/flush.
+    ///
+    /// Returns [`DeferResult::Deferred`] if a write lock could not be obtained at this moment (and thus,
+    /// `when_writable` was instead pushed to the queue).
+    pub fn defer<F>(&self, when_writable: F) -> DeferResult
+    where
+        F: FnOnce(&mut T) + 'static,
+    {
+        if let Some(mut value) = self.lock.try_write() {
+            // if we can write, drain the queue first
+            while let Some((f, listener)) = self.queue.write().pop_front() {
+                f(&mut *value);
+
+                // notify the DeferResult's listener that the operation has completed
+                listener.store(true, Ordering::Release);
+            }
+            // then apply the latest operation
+            when_writable(&mut *value);
+
+            DeferResult::Completed
+        } else {
+            // if we can't currently obtain a write lock, push the operation to the queue
+            let listener = Arc::new(AtomicBool::new(false));
+            self.queue
+                .write()
+                .push_back((Box::new(when_writable), listener.clone()));
+
+            DeferResult::Deferred(listener)
+        }
+    }
+
+    pub fn flush(&self) -> bool {
+        if let Some(mut value) = self.lock.try_write() {
+            while let Some((f, listener)) = self.queue.write().pop_front() {
+                f(&mut *value);
+
+                // notify the DeferResult's listener that the operation has completed
+                listener.store(true, Ordering::Release);
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_defer() {
+        let lock = DeferLock::new(1);
+        assert_eq!(*lock.read(), 1);
+
+        let mut res = lock.defer(|lock| *lock += 1);
+        assert!(res.check_completed());
+        assert_eq!(*lock.read(), 2);
+
+        let read = lock.read();
+        let mut res = lock.defer(|lock| *lock += 1);
+        assert!(!res.check_completed());
+        assert_eq!(*read, 2);
+
+        drop(read);
+        assert!(lock.flush());
+
+        assert!(res.check_completed());
+        assert_eq!(*lock.read(), 3);
     }
 }

@@ -1,40 +1,44 @@
-use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::{fmt::Debug, ops::Deref};
+
+use katabatic_util::lock::SharedLock;
 
 use crate::{data::Data, id::Id, world::WorldHandle};
 
+#[derive(Clone)]
 #[repr(C)]
 pub struct Node {
-    data: Data,
+    data: SharedLock<Data>,
     id: Id,
     world: WorldHandle,
-    parent: Option<Id>,
-    children: Vec<Id>,
+}
+
+impl Node {
+    pub fn data(&self) -> &SharedLock<Data> {
+        &self.data
+    }
+
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+
+    pub fn world(&self) -> &WorldHandle {
+        &self.world
+    }
 }
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Node")
             .field("id", &self.id)
-            .field("parent", &self.parent)
-            .field("children", &self.children)
             .field("data", &self.data)
             .finish()
     }
 }
 
 impl Deref for Node {
-    type Target = Data;
+    type Target = SharedLock<Data>;
 
     fn deref(&self) -> &Self::Target {
         &self.data
-    }
-}
-
-impl DerefMut for Node {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
     }
 }

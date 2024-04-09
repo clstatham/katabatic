@@ -1,3 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/katabatic-core", "crates/katabatic-scene", "crates/katabatic-util"]
+members = [
+    "crates/katabatic-core",
+    "crates/katabatic-scene",
+    "crates/katabatic-util",
+]
