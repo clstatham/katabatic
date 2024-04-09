@@ -2,32 +2,32 @@ use std::backtrace::Backtrace;
 
 /// Main error type.
 #[derive(Debug)]
-pub struct KError<'a> {
-    pub desc: Option<&'a str>,
+pub struct KError {
+    pub desc: Option<String>,
     pub backtrace: Backtrace,
 }
 
-impl<'a> PartialEq for KError<'a> {
+impl PartialEq for KError {
     fn eq(&self, other: &Self) -> bool {
         self.desc.eq(&other.desc)
     }
 }
 
 /// Main result type. Alias for [`std::result::Result`]`<T, `[`KError`]`<'static>>`.
-pub type KResult<T> = std::result::Result<T, KError<'static>>;
+pub type KResult<T> = std::result::Result<T, KError>;
 
 #[macro_export]
 macro_rules! kerror {
     ($desc:expr) => {
         $crate::error::KError {
-            desc: Some($desc),
-            backtrace: Backtrace::capture(),
+            desc: Some($desc.to_string()),
+            backtrace: std::backtrace::Backtrace::capture(),
         }
     };
     () => {
         $crate::error::KError {
             desc: None,
-            backtrace: Backtrace::capture(),
+            backtrace: std::backtrace::Backtrace::capture(),
         }
     };
 }
@@ -66,7 +66,7 @@ mod tests {
         let e = kerror!();
         assert_eq!(e.desc, None);
         let e = kerror!("Uh oh!");
-        assert_eq!(e.desc, Some("Uh oh!"));
+        assert_eq!(e.desc, Some("Uh oh!".to_string()));
     }
 
     #[test]
@@ -81,7 +81,7 @@ mod tests {
 
         assert_eq!(success(), Ok(()));
         if let Err(e) = fail() {
-            assert_eq!(e.desc, Some("Uh oh!"))
+            assert_eq!(e.desc, Some("Uh oh!".to_string()))
         } else {
             panic!()
         }
@@ -101,7 +101,7 @@ mod tests {
 
         assert_eq!(success(), Ok(()));
         if let Err(e) = fail() {
-            assert_eq!(e.desc, Some("Uh oh!"))
+            assert_eq!(e.desc, Some("Uh oh!".to_string()))
         } else {
             panic!()
         }

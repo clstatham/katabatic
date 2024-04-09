@@ -1,11 +1,10 @@
 [package]
-name = "katabatic-core"
+name = "katabatic-scene"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-downcast-rs = "1.2.0"
-katabatic-scene = { path = "../katabatic-scene" }
+generational-arena = "0.2.9"
 katabatic-util = { path = "../katabatic-util" }

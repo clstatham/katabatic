@@ -1,0 +1,5 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./crates/katabatic-core/Cargo.toml"
+    ]
+}
