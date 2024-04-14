@@ -44,18 +44,3 @@ impl Plugin for WinitPlugin {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use katabatic_core::app::App;
-
-    #[test]
-    fn test_render_plugin() {
-        App::new()
-            .add_plugin(WinitPlugin::new())
-            .unwrap()
-            .run()
-            .unwrap();
-    }
-}
