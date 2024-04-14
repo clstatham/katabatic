@@ -68,4 +68,12 @@ impl Data {
     pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
         (*self.item).downcast_mut()
     }
+
+    pub fn downcast<T: Any>(self) -> Result<Box<T>, Self> {
+        if self.is::<T>() {
+            Ok(self.item.downcast().unwrap())
+        } else {
+            Err(self)
+        }
+    }
 }

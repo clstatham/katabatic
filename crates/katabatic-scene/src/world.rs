@@ -1,96 +1,56 @@
-use std::{any::Any, fmt::Debug};
+use std::{
+    fmt::Debug,
+    sync::{Arc, OnceLock},
+};
 
 use generational_arena::{Arena, Index};
-use katabatic_util::lock::{Read, SharedLock, Write};
+use katabatic_util::lock::SharedLock;
 
-use crate::{data::Data, id::Id, node::Node, scene::Scene};
+use crate::{node::Node, scene::Scene};
 
+#[derive(Clone)]
 pub struct World {
-    nodes: Arena<Node>,
-    root: Index,
-}
-
-impl Default for World {
-    fn default() -> Self {
-        Self {
-            nodes: Arena::new(),
-            root: Index::from_raw_parts(usize::MAX, u64::MAX),
-        }
-    }
+    nodes: SharedLock<Arena<SharedLock<Node>>>,
+    root: OnceLock<Index>,
 }
 
 impl World {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
+    pub fn new() -> Arc<Self> {
+        #[allow(clippy::arc_with_non_send_sync)]
+        let this = Arc::new(Self {
+            nodes: SharedLock::new(Arena::new()),
+            root: OnceLock::new(),
+        });
 
-impl std::ops::Index<Id> for World {
-    type Output = Node;
+        let root = this
+            .nodes
+            .write()
+            .insert(SharedLock::new(Node::Scene(Scene::new(this.clone()))));
 
-    fn index(&self, index: Id) -> &Self::Output {
-        &self.nodes[index.node_id]
-    }
-}
-
-impl std::ops::IndexMut<Id> for World {
-    fn index_mut(&mut self, index: Id) -> &mut Self::Output {
-        &mut self.nodes[index.node_id]
-    }
-}
-
-#[derive(Clone)]
-pub struct WorldHandle {
-    world: SharedLock<World>,
-}
-
-impl Default for WorldHandle {
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-
-impl WorldHandle {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn empty() -> Self {
-        let this = Self {
-            world: SharedLock::new(World::new()),
-        };
-
-        let root_id = this.create_scene();
-
-        this.write().root = root_id;
+        this.root.get_or_init(|| root);
 
         this
     }
 
-    pub fn read(&self) -> Read<World> {
-        self.world.read()
+    pub fn root(&self) -> Index {
+        *self.root.get().unwrap()
     }
 
-    pub fn write(&self) -> Write<World> {
-        self.world.write()
+    pub fn insert_node(&self, node: Node) -> Index {
+        self.nodes.write().insert(SharedLock::new(node))
     }
 
-    pub fn insert_data<T: Any>(&self, data: T) -> Index {
-        self.write().nodes.insert(Node::Data(Data::new(data)))
-    }
-
-    pub fn create_scene(&self) -> Index {
-        let scene = Scene::new(self.clone());
-        self.write().nodes.insert(Node::Scene(scene))
+    pub fn remove_node(&self, id: Index) -> Option<SharedLock<Node>> {
+        self.nodes.write().remove(id)
     }
 
     pub fn with_root<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&Scene) -> R,
     {
-        let root_id = self.read().root;
-        let root = &self.read().nodes[root_id];
-        match root {
+        let root = self.nodes.read()[self.root()].clone();
+        let root = root.read();
+        match &*root {
             Node::Scene(root) => f(root),
             _ => unreachable!("WorldHandle::with_root(): Root node is not a Scene"),
         }
@@ -100,16 +60,16 @@ impl WorldHandle {
     where
         F: FnOnce(&mut Scene) -> R,
     {
-        let root_id = self.read().root;
-        let root = &mut self.write().nodes[root_id];
-        match root {
+        let root = self.nodes.read()[self.root()].clone();
+        let mut root = root.write();
+        match &mut *root {
             Node::Scene(root) => f(root),
             _ => unreachable!("WorldHandle::with_root_mut(): Root node is not a Scene"),
         }
     }
 }
 
-impl Debug for WorldHandle {
+impl Debug for World {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("WorldHandle")
     }

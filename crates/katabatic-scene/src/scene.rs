@@ -1,37 +1,26 @@
-use std::any::Any;
+use std::sync::Arc;
 
 use generational_arena::Index;
 use petgraph::prelude::*;
 
-use crate::{id::Id, world::WorldHandle};
+use crate::{id::Id, node::Node, world::World};
 
 #[derive(Debug)]
 pub struct Scene {
-    pub(crate) world: WorldHandle,
+    pub(crate) world: Arc<World>,
     pub(crate) graph: StableDiGraph<Index, ()>,
 }
 
 impl Scene {
-    pub fn new(world: WorldHandle) -> Self {
+    pub fn new(world: Arc<World>) -> Self {
         Self {
             world,
-            graph: StableDiGraph::new(),
+            graph: StableGraph::new(),
         }
     }
 
-    pub fn add_data<T: Any>(&mut self, data: T) -> Id {
-        let node_id = self.world.insert_data(data);
-
-        let scene_index = self.graph.add_node(node_id);
-
-        Id {
-            node_id,
-            scene_index,
-        }
-    }
-
-    pub fn add_scene(&mut self) -> Id {
-        let node_id = self.world.create_scene();
+    pub fn add_node(&mut self, node: Node) -> Id {
+        let node_id = self.world.insert_node(node);
 
         let scene_index = self.graph.add_node(node_id);
 

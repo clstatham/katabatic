@@ -1,3 +1,12 @@
+[package]
+name = "katabatic"
+edition = "2021"
+authors = ["Connor Statham"]
+
+[lib]
+name = "katabatic"
+path = "src/lib.rs"
+
 [workspace]
 resolver = "2"
 members = [
@@ -5,4 +14,11 @@ members = [
     "crates/katabatic-scene",
     "crates/katabatic-util",
     "crates/katabatic-winit",
+    "examples/dev-test",
 ]
+
+[dependencies]
+katabatic-core = { path = "crates/katabatic-core" }
+katabatic-util = { path = "crates/katabatic-util" }
+katabatic-scene = { path = "crates/katabatic-scene" }
+katabatic-winit = { path = "crates/katabatic-winit" }

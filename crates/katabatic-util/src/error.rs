@@ -1,4 +1,4 @@
-use std::backtrace::Backtrace;
+use std::{backtrace::Backtrace, error::Error, fmt::Display};
 
 /// Main error type.
 #[derive(Debug)]
@@ -12,6 +12,14 @@ impl PartialEq for KError {
         self.desc.eq(&other.desc)
     }
 }
+
+impl Display for KError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl Error for KError {}
 
 /// Main result type. Alias for [`std::result::Result`]`<T, `[`KError`]`<'static>>`.
 pub type KResult<T> = std::result::Result<T, KError>;

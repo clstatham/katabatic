@@ -1,20 +1,25 @@
-use std::{any::TypeId, collections::HashMap};
+use std::{any::TypeId, collections::HashMap, sync::Arc};
 
-use katabatic_scene::world::WorldHandle;
+use katabatic_scene::world::World;
 use katabatic_util::error::KResult;
 
-use crate::plugin::Plugin;
+use crate::{
+    plugin::Plugin,
+    runner::{DefaultRunner, Runner},
+};
 
 pub struct App {
-    world: WorldHandle,
+    world: Arc<World>,
     plugins: HashMap<TypeId, Box<dyn Plugin>>,
+    runner: Option<Box<dyn Runner>>,
 }
 
 impl Default for App {
     fn default() -> Self {
         Self {
-            world: WorldHandle::new(),
+            world: World::new(),
             plugins: HashMap::new(),
+            runner: Some(Box::<DefaultRunner>::default()),
         }
     }
 }
@@ -24,7 +29,7 @@ impl App {
         Self::default()
     }
 
-    pub fn world(&self) -> &WorldHandle {
+    pub fn world(&self) -> &World {
         &self.world
     }
 
@@ -44,7 +49,21 @@ impl App {
         }
     }
 
+    pub fn set_runner<T>(&mut self, runner: T)
+    where
+        T: Runner + 'static,
+    {
+        self.runner = Some(Box::new(runner));
+    }
+
     pub fn run(&mut self) -> KResult<()> {
+        let mut runner = self
+            .runner
+            .take()
+            .expect("App:run(): Runner not initialized");
+
+        runner.run(self)?;
+
         let plugins = std::mem::take(&mut self.plugins);
 
         for plugin in plugins.values() {
