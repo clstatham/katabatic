@@ -329,11 +329,12 @@ impl DeferResult {
             }
         }
     }
+
+    pub fn whenever(self) {}
 }
 
 pub type DeferredFn<T> = Box<dyn FnOnce(&mut T)>;
 
-#[derive(Clone)]
 pub struct DeferLock<T: ?Sized> {
     lock: SharedLock<T>,
     queue: SharedLock<VecDeque<(DeferredFn<T>, Arc<AtomicBool>)>>,
@@ -404,6 +405,15 @@ impl<T> DeferLock<T> {
             true
         } else {
             false
+        }
+    }
+}
+
+impl<T> Clone for DeferLock<T> {
+    fn clone(&self) -> Self {
+        Self {
+            lock: self.lock.clone(),
+            queue: self.queue.clone(),
         }
     }
 }

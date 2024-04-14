@@ -3,7 +3,7 @@ use katabatic_util::error::KResult;
 
 use crate::app::App;
 
-pub trait Plugin: Downcast + Send + Sync {
+pub trait Plugin: Downcast {
     fn build(&self, app: &mut App) -> KResult<()>;
 
     #[allow(unused)]

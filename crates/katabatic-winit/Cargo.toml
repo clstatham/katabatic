@@ -1,11 +1,12 @@
 [package]
-name = "katabatic-scene"
+name = "katabatic-winit"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generational-arena = "0.2.9"
+winit = "0.29.15"
+katabatic-core = { path = "../katabatic-core" }
 katabatic-util = { path = "../katabatic-util" }
-petgraph = "0.6.4"
+katabatic-scene = { path = "../katabatic-scene" }

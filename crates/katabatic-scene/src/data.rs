@@ -8,7 +8,7 @@ use std::{
 #[derive(Debug)]
 #[repr(C)]
 pub struct Data {
-    item: Box<dyn Any + Send + Sync>,
+    item: Box<dyn Any>,
     type_id: TypeId,
     type_name: Cow<'static, str>,
     size: usize,
@@ -16,7 +16,7 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn new<T: Any + Send + Sync>(item: T) -> Data {
+    pub fn new<T: Any>(item: T) -> Data {
         Data {
             type_id: TypeId::of::<T>(),
             type_name: type_name::<T>().into(),
@@ -42,16 +42,23 @@ impl Data {
         self.align
     }
 
-    pub fn item(&self) -> &(dyn Any + Send + Sync) {
+    pub fn item(&self) -> &(dyn Any) {
         &*self.item
     }
 
-    pub fn item_mut(&mut self) -> &mut (dyn Any + Send + Sync) {
+    pub fn item_mut(&mut self) -> &mut (dyn Any) {
         &mut *self.item
     }
 
     pub fn is<T: Any>(&self) -> bool {
-        self.type_id == TypeId::of::<T>()
+        #[cfg(debug_assertions)]
+        {
+            self.type_id == TypeId::of::<T>() && self.item().is::<T>()
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            self.type_id == TypeId::of::<T>()
+        }
     }
 
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
