@@ -1,12 +1,15 @@
 [package]
-name = "katabatic-winit"
+name = "katabatic-wgpu"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-winit = "0.28"
 katabatic-core = { path = "../katabatic-core" }
 katabatic-util = { path = "../katabatic-util" }
 katabatic-scene = { path = "../katabatic-scene" }
+katabatic-winit = { path = "../katabatic-winit" }
+wgpu = "0.18"
+pollster = "0.3.0"
+winit = "0.28"

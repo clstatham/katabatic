@@ -33,7 +33,7 @@ impl App {
         &self.world
     }
 
-    pub fn add_plugin<T: Plugin>(&mut self, plugin: T) -> KResult<&mut Self> {
+    pub fn add_plugin<T: Plugin>(&mut self, mut plugin: T) -> KResult<&mut Self> {
         plugin.build(self)?;
 
         self.plugins.insert(TypeId::of::<T>(), Box::new(plugin));

@@ -67,6 +67,24 @@ impl World {
             _ => unreachable!("WorldHandle::with_root_mut(): Root node is not a Scene"),
         }
     }
+
+    pub fn with_node<F, R>(&self, id: Index, f: F) -> R
+    where
+        F: FnOnce(&Node) -> R,
+    {
+        let node = self.nodes.read()[id].clone();
+        let node = node.read();
+        f(&node)
+    }
+
+    pub fn with_node_mut<F, R>(&self, id: Index, f: F) -> R
+    where
+        F: FnOnce(&mut Node) -> R,
+    {
+        let node = self.nodes.read()[id].clone();
+        let mut node = node.write();
+        f(&mut node)
+    }
 }
 
 impl Debug for World {

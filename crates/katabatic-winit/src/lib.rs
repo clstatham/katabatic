@@ -5,7 +5,7 @@ use katabatic_scene::{data::Data, id::Id, node::Node};
 use katabatic_util::{error::KResult, kerror};
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::{EventLoop, EventLoopBuilder},
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
     window::Window,
 };
 
@@ -38,10 +38,8 @@ impl WinitPlugin {
 }
 
 impl Plugin for WinitPlugin {
-    fn build(&self, app: &mut App) -> KResult<()> {
-        let event_loop = EventLoopBuilder::new()
-            .build()
-            .expect("WinitPlugin::build(): Error creating event loop");
+    fn build(&mut self, app: &mut App) -> KResult<()> {
+        let event_loop = EventLoopBuilder::new().build();
 
         let window = Window::new(&event_loop).expect("WinitPlugin::build(): Error creating window");
 
@@ -87,23 +85,14 @@ impl Runner for WinitRunner {
             _ => unreachable!(),
         };
 
-        event_loop
-            .run(move |event, window| match event {
-                Event::WindowEvent { event, .. } => {
-                    if event == WindowEvent::CloseRequested {
-                        window.exit();
-                    }
+        event_loop.run(move |event, window, control_flow| match event {
+            Event::WindowEvent { event, .. } => {
+                if event == WindowEvent::CloseRequested {
+                    *control_flow = ControlFlow::Exit;
                 }
-                Event::DeviceEvent { event, .. } => {}
-                _ => {}
-            })
-            .map_err(|e| {
-                kerror!(format!(
-                    "WinitRunner::run(): Error in Winit event loop: {:?}",
-                    e
-                ))
-            })?;
-
-        Ok(())
+            }
+            Event::DeviceEvent { event, .. } => {}
+            _ => {}
+        });
     }
 }

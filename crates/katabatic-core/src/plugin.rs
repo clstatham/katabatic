@@ -4,7 +4,7 @@ use katabatic_util::error::KResult;
 use crate::app::App;
 
 pub trait Plugin: Downcast {
-    fn build(&self, app: &mut App) -> KResult<()>;
+    fn build(&mut self, app: &mut App) -> KResult<()>;
 
     #[allow(unused)]
     fn ready(&self, app: &App) -> bool {

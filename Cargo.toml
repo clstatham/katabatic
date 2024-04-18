@@ -13,6 +13,7 @@ members = [
     "crates/katabatic-core",
     "crates/katabatic-scene",
     "crates/katabatic-util",
+    "crates/katabatic-wgpu",
     "crates/katabatic-winit",
     "examples/dev-test",
 ]
@@ -22,3 +23,4 @@ katabatic-core = { path = "crates/katabatic-core" }
 katabatic-util = { path = "crates/katabatic-util" }
 katabatic-scene = { path = "crates/katabatic-scene" }
 katabatic-winit = { path = "crates/katabatic-winit" }
+katabatic-wgpu = { path = "crates/katabatic-wgpu" }
