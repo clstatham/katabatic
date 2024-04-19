@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use katabatic_core::{app::App, plugin::Plugin, runner::Runner};
 use katabatic_scene::{data::Data, id::Id, node::Node};
-use katabatic_util::{error::KResult, kerror};
+use katabatic_util::error::KResult;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
@@ -85,13 +85,13 @@ impl Runner for WinitRunner {
             _ => unreachable!(),
         };
 
-        event_loop.run(move |event, window, control_flow| match event {
+        event_loop.run(move |event, _window, control_flow| match event {
             Event::WindowEvent { event, .. } => {
                 if event == WindowEvent::CloseRequested {
                     *control_flow = ControlFlow::Exit;
                 }
             }
-            Event::DeviceEvent { event, .. } => {}
+            Event::DeviceEvent { event: _, .. } => {}
             _ => {}
         });
     }

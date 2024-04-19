@@ -638,6 +638,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "katabatic-ecs"
+version = "0.1.0"
+dependencies = [
+ "katabatic-util",
+]
+
+[[package]]
 name = "katabatic-scene"
 version = "0.1.0"
 dependencies = [
