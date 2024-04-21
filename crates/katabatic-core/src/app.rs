@@ -6,7 +6,7 @@ use katabatic_util::{error::KResult, lock::SharedLock};
 
 use crate::{
     plugin::Plugin,
-    runner::{DefaultRunner, Runner},
+    runner::{Hook, NoOpRunner, Runner},
 };
 
 pub struct App {
@@ -14,6 +14,7 @@ pub struct App {
     root_scene: SharedLock<Scene>,
     plugins: HashMap<TypeId, Box<dyn Plugin>>,
     runner: Option<Box<dyn Runner>>,
+    hooks: Vec<Box<dyn Hook>>,
 }
 
 impl Default for App {
@@ -24,7 +25,8 @@ impl Default for App {
             world,
             root_scene: SharedLock::new(root_scene),
             plugins: HashMap::new(),
-            runner: Some(Box::<DefaultRunner>::default()),
+            runner: Some(Box::<NoOpRunner>::default()),
+            hooks: Vec::new(),
         }
     }
 }
@@ -42,8 +44,44 @@ impl App {
         &self.root_scene
     }
 
-    pub fn add_plugin<T: Plugin>(&mut self, mut plugin: T) -> KResult<&mut Self> {
-        plugin.build(self)?;
+    pub fn add_hook<T: Hook>(&mut self, hook: T) {
+        self.hooks.push(Box::new(hook));
+    }
+
+    pub fn run_init_hooks(&self) -> KResult<()> {
+        for hook in &self.hooks {
+            hook.init(self)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run_update_hooks(&self) -> KResult<()> {
+        for hook in &self.hooks {
+            hook.update(self)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run_render_hooks(&self) -> KResult<()> {
+        for hook in &self.hooks {
+            hook.render(self)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run_cleanup_hooks(&self) -> KResult<()> {
+        for hook in &self.hooks {
+            hook.cleanup(self)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn add_plugin<T: Plugin>(mut self, mut plugin: T) -> KResult<Self> {
+        plugin.build(&mut self)?;
 
         self.plugins.insert(TypeId::of::<T>(), Box::new(plugin));
 
@@ -65,23 +103,13 @@ impl App {
         self.runner = Some(Box::new(runner));
     }
 
-    pub fn run(&mut self) -> KResult<()> {
+    pub fn run(mut self) -> KResult<()> {
         let mut runner = self
             .runner
             .take()
             .expect("App:run(): Runner not initialized");
 
         runner.run(self)?;
-
-        let plugins = std::mem::take(&mut self.plugins);
-
-        for plugin in plugins.values() {
-            plugin.finish(self)?;
-        }
-
-        for plugin in plugins.values() {
-            plugin.cleanup(self)?;
-        }
 
         Ok(())
     }

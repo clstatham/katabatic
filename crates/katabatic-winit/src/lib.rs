@@ -61,7 +61,7 @@ impl Plugin for WinitPlugin {
 pub struct WinitRunner;
 
 impl Runner for WinitRunner {
-    fn run(&mut self, app: &mut App) -> KResult<()> {
+    fn run(&mut self, app: App) -> KResult<()> {
         let plugin = app
             .get_plugin::<WinitPlugin>()
             .expect("WinitRunner::run(): WinitPlugin not present in App");
@@ -76,6 +76,8 @@ impl Runner for WinitRunner {
             .remove_component::<EventLoop<()>>(event_loop_id.entity)
             .unwrap();
 
+        app.run_init_hooks()?;
+
         event_loop.run(move |event, _window, control_flow| match event {
             Event::WindowEvent { event, .. } => {
                 if event == WindowEvent::CloseRequested {
@@ -83,6 +85,13 @@ impl Runner for WinitRunner {
                 }
             }
             Event::DeviceEvent { event: _, .. } => {}
+            Event::RedrawRequested(_) => {
+                app.run_update_hooks().unwrap();
+                app.run_render_hooks().unwrap();
+            }
+            Event::LoopDestroyed => {
+                app.run_cleanup_hooks().unwrap();
+            }
             _ => {}
         });
     }

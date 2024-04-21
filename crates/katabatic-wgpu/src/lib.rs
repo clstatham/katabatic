@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use katabatic_core::{app::App, plugin::Plugin};
+use katabatic_core::{app::App, plugin::Plugin, runner::Hook};
 use katabatic_util::error::KResult;
 use katabatic_winit::WinitPlugin;
 use winit::window::Window;
@@ -98,6 +98,57 @@ impl Plugin for WgpuPlugin {
             device: Arc::new(device),
             queue: Arc::new(queue),
         });
+
+        drop(window);
+        drop(world);
+
+        app.add_hook(WgpuRenderHook);
+
+        Ok(())
+    }
+}
+
+pub struct WgpuRenderHook;
+
+impl Hook for WgpuRenderHook {
+    fn render(&self, app: &App) -> KResult<()> {
+        let wgpu_plugin = app
+            .get_plugin::<WgpuPlugin>()
+            .expect("WgpuRenderHook::render(): Wgpu plugin not present");
+
+        let surface = wgpu_plugin.surface();
+        let device = wgpu_plugin.device();
+        let queue = wgpu_plugin.queue();
+
+        let frame = surface.get_current_texture().unwrap();
+
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Katabatic Engine Main Command Encoder"),
+        });
+
+        {
+            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Katabatic Engine Main Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+        }
+
+        queue.submit(std::iter::once(encoder.finish()));
+
+        frame.present();
 
         Ok(())
     }
