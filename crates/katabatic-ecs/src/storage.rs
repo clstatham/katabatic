@@ -314,20 +314,12 @@ impl Storage {
         }
     }
 
-    pub fn remove_component<T: Component>(&mut self, entity: Entity) {
+    pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
         // remove the entity from its current archetype
 
-        let old_archetype_id = if let Some(archetype_id) = self.entity_archetype.get(&entity) {
-            archetype_id
-        } else {
-            return;
-        };
+        let old_archetype_id = self.entity_archetype.get(&entity)?;
 
-        let old_archetype = if let Some(archetype) = self.archetypes.get_mut(old_archetype_id) {
-            archetype
-        } else {
-            return;
-        };
+        let old_archetype = self.archetypes.get_mut(old_archetype_id)?;
 
         let mut data = old_archetype.remove(entity.id() as usize);
 
@@ -338,7 +330,7 @@ impl Storage {
         self.entity_archetype.remove(&entity);
 
         // remove the component from the data
-        data.retain(|data| !data.is::<T>());
+        let component = data.remove(data.iter().position(|data| data.is::<T>())?);
 
         // find the new archetype for the entity
         let new_archetype = self
@@ -372,6 +364,8 @@ impl Storage {
         }
 
         self.entity_archetype.insert(entity, new_archetype_id);
+
+        Some(*component.into_data().as_any_box().downcast::<T>().unwrap())
     }
 
     pub fn remove_entity(&mut self, entity: Entity) -> Option<Vec<Data>> {

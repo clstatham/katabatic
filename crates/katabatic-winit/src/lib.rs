@@ -1,7 +1,7 @@
 use std::cell::Cell;
 
 use katabatic_core::{app::App, plugin::Plugin, runner::Runner};
-use katabatic_scene::{data::Data, id::Id, node::Node};
+use katabatic_scene::node::Node;
 use katabatic_util::error::KResult;
 use winit::{
     event::{Event, WindowEvent},
@@ -10,8 +10,8 @@ use winit::{
 };
 
 pub struct WinitPlugin {
-    event_loop_id: Cell<Option<Id>>,
-    window_id: Cell<Option<Id>>,
+    event_loop_id: Cell<Option<Node>>,
+    window_id: Cell<Option<Node>>,
 }
 
 impl Default for WinitPlugin {
@@ -28,11 +28,11 @@ impl WinitPlugin {
         Self::default()
     }
 
-    pub fn event_loop_id(&self) -> Option<Id> {
+    pub fn event_loop_id(&self) -> Option<Node> {
         self.event_loop_id.get()
     }
 
-    pub fn window_id(&self) -> Option<Id> {
+    pub fn window_id(&self) -> Option<Node> {
         self.window_id.get()
     }
 }
@@ -43,15 +43,11 @@ impl Plugin for WinitPlugin {
 
         let window = Window::new(&event_loop).expect("WinitPlugin::build(): Error creating window");
 
-        let event_loop_id = app
-            .world()
-            .with_root_mut(|root| root.add_node(Node::Data(Data::new(event_loop))));
+        let event_loop_id = app.root_scene().write().create_node_with(event_loop);
 
         self.event_loop_id.set(Some(event_loop_id));
 
-        let window_id = app
-            .world()
-            .with_root_mut(|root| root.add_node(Node::Data(Data::new(window))));
+        let window_id = app.root_scene().write().create_node_with(window);
 
         self.window_id.set(Some(window_id));
 
@@ -76,14 +72,9 @@ impl Runner for WinitRunner {
 
         let event_loop = app
             .world()
-            .remove_node(event_loop_id.node_id)
-            .unwrap()
-            .into_inner()
+            .write()
+            .remove_component::<EventLoop<()>>(event_loop_id.entity)
             .unwrap();
-        let event_loop = match event_loop {
-            Node::Data(event_loop) => *event_loop.downcast::<EventLoop<()>>().unwrap(),
-            _ => unreachable!(),
-        };
 
         event_loop.run(move |event, _window, control_flow| match event {
             Event::WindowEvent { event, .. } => {

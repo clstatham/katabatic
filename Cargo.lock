@@ -428,15 +428,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fb8e00e87438d937621c1c6269e53f536c14d3fbd6a042bb24879e57d474fb5"
 
 [[package]]
-name = "generational-arena"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877e94aff08e743b651baaea359664321055749b398adff8740a7399af7796e7"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -633,6 +624,7 @@ name = "katabatic-core"
 version = "0.1.0"
 dependencies = [
  "downcast-rs",
+ "katabatic-ecs",
  "katabatic-scene",
  "katabatic-util",
 ]
@@ -648,7 +640,7 @@ dependencies = [
 name = "katabatic-scene"
 version = "0.1.0"
 dependencies = [
- "generational-arena",
+ "katabatic-ecs",
  "katabatic-util",
  "petgraph",
 ]
@@ -665,6 +657,7 @@ name = "katabatic-wgpu"
 version = "0.1.0"
 dependencies = [
  "katabatic-core",
+ "katabatic-ecs",
  "katabatic-scene",
  "katabatic-util",
  "katabatic-winit",
@@ -678,6 +671,7 @@ name = "katabatic-winit"
 version = "0.1.0"
 dependencies = [
  "katabatic-core",
+ "katabatic-ecs",
  "katabatic-scene",
  "katabatic-util",
  "winit",

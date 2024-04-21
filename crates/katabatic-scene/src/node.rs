@@ -1,6 +1,8 @@
-use crate::{data::Data, scene::Scene};
+use katabatic_ecs::entity::Entity;
+use petgraph::graph::NodeIndex;
 
-pub enum Node {
-    Data(Data),
-    Scene(Scene),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Node {
+    pub entity: Entity,
+    pub scene_index: NodeIndex,
 }

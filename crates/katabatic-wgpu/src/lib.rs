@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use katabatic_core::{app::App, plugin::Plugin};
-use katabatic_scene::node::Node;
 use katabatic_util::error::KResult;
 use katabatic_winit::WinitPlugin;
 use winit::window::Window;
@@ -23,15 +22,27 @@ impl WgpuPlugin {
     }
 
     pub fn surface(&self) -> &Arc<wgpu::Surface> {
-        &self.inner.as_ref().unwrap().surface
+        &self
+            .inner
+            .as_ref()
+            .expect("WgpuPlugin::surface(): Plugin not initialized")
+            .surface
     }
 
     pub fn device(&self) -> &Arc<wgpu::Device> {
-        &self.inner.as_ref().unwrap().device
+        &self
+            .inner
+            .as_ref()
+            .expect("WgpuPlugin::device(): Plugin not initialized")
+            .device
     }
 
     pub fn queue(&self) -> &Arc<wgpu::Queue> {
-        &self.inner.as_ref().unwrap().queue
+        &self
+            .inner
+            .as_ref()
+            .expect("WgpuPlugin::queue(): Plugin not initialized")
+            .queue
     }
 }
 
@@ -44,58 +55,49 @@ impl Plugin for WgpuPlugin {
             .window_id()
             .expect("WgpuPlugin::build(): Winit plugin not initialized");
 
-        app.world()
-            .with_node(window_id.node_id, |window_node| match window_node {
-                Node::Data(window_data) => {
-                    let window = window_data.downcast_ref::<Window>().unwrap();
+        let world = app.world().read();
 
-                    let instance = wgpu::Instance::default();
+        let window = world.get_component::<Window>(window_id.entity).unwrap();
 
-                    let surface = unsafe { instance.create_surface(window) }.unwrap();
+        let instance = wgpu::Instance::default();
 
-                    let adapter = pollster::block_on(instance.request_adapter(
-                        &wgpu::RequestAdapterOptions {
-                            power_preference: wgpu::PowerPreference::HighPerformance,
-                            force_fallback_adapter: false,
-                            compatible_surface: Some(&surface),
-                        },
-                    ))
-                    .expect("WgpuPlugin::build(): Error requesting adapter");
+        let surface = unsafe { instance.create_surface(&*window) }.unwrap();
 
-                    let (device, queue) = pollster::block_on(adapter.request_device(
-                        &wgpu::DeviceDescriptor {
-                            label: Some("Katabatic Engine Main Device"),
-                            features: wgpu::Features::all_webgpu_mask(),
-                            limits: wgpu::Limits::downlevel_defaults(),
-                        },
-                        None,
-                    ))
-                    .expect("WgpuPlugin::build(): Error requesting device");
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            force_fallback_adapter: false,
+            compatible_surface: Some(&surface),
+        }))
+        .expect("WgpuPlugin::build(): Error requesting adapter");
 
-                    let surface_caps = surface.get_capabilities(&adapter);
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                label: Some("Katabatic Engine Main Device"),
+                features: wgpu::Features::all_webgpu_mask(),
+                limits: wgpu::Limits::downlevel_defaults(),
+            },
+            None,
+        ))
+        .expect("WgpuPlugin::build(): Error requesting device");
 
-                    let config = wgpu::SurfaceConfiguration {
-                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                            | wgpu::TextureUsages::COPY_DST,
-                        format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                        width: window.inner_size().width,
-                        height: window.inner_size().height,
-                        present_mode: wgpu::PresentMode::AutoNoVsync,
-                        alpha_mode: surface_caps.alpha_modes[0],
-                        view_formats: vec![],
-                    };
-                    surface.configure(&device, &config);
+        let surface_caps = surface.get_capabilities(&adapter);
 
-                    self.inner = Some(WgpuPluginInner {
-                        surface: Arc::new(surface),
-                        device: Arc::new(device),
-                        queue: Arc::new(queue),
-                    });
-                }
-                Node::Scene(_) => {
-                    unreachable!("WgpuPlugin::build(): Window node is not a Data node")
-                }
-            });
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            width: window.inner_size().width,
+            height: window.inner_size().height,
+            present_mode: wgpu::PresentMode::AutoNoVsync,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+        };
+        surface.configure(&device, &config);
+
+        self.inner = Some(WgpuPluginInner {
+            surface: Arc::new(surface),
+            device: Arc::new(device),
+            queue: Arc::new(queue),
+        });
 
         Ok(())
     }

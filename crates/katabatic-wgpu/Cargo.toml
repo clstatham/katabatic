@@ -10,6 +10,7 @@ katabatic-core = { path = "../katabatic-core" }
 katabatic-util = { path = "../katabatic-util" }
 katabatic-scene = { path = "../katabatic-scene" }
 katabatic-winit = { path = "../katabatic-winit" }
+katabatic-ecs = { path = "../katabatic-ecs" }
 wgpu = "0.18"
 pollster = "0.3.0"
 winit = "0.28"

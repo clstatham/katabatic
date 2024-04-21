@@ -42,7 +42,7 @@ impl World {
         self.storage.insert_component(entity, component)
     }
 
-    pub fn remove_component<T: Component>(&mut self, entity: Entity) {
+    pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
         self.storage.remove_component::<T>(entity)
     }
 

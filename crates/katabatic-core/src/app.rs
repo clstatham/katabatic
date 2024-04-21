@@ -1,7 +1,8 @@
-use std::{any::TypeId, collections::HashMap, sync::Arc};
+use std::{any::TypeId, collections::HashMap};
 
-use katabatic_scene::world::World;
-use katabatic_util::error::KResult;
+use katabatic_ecs::world::World;
+use katabatic_scene::scene::Scene;
+use katabatic_util::{error::KResult, lock::SharedLock};
 
 use crate::{
     plugin::Plugin,
@@ -9,15 +10,19 @@ use crate::{
 };
 
 pub struct App {
-    world: Arc<World>,
+    world: SharedLock<World>,
+    root_scene: SharedLock<Scene>,
     plugins: HashMap<TypeId, Box<dyn Plugin>>,
     runner: Option<Box<dyn Runner>>,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let world = SharedLock::new(World::new());
+        let root_scene = Scene::new(world.clone());
         Self {
-            world: World::new(),
+            world,
+            root_scene: SharedLock::new(root_scene),
             plugins: HashMap::new(),
             runner: Some(Box::<DefaultRunner>::default()),
         }
@@ -29,8 +34,12 @@ impl App {
         Self::default()
     }
 
-    pub fn world(&self) -> &World {
+    pub fn world(&self) -> &SharedLock<World> {
         &self.world
+    }
+
+    pub fn root_scene(&self) -> &SharedLock<Scene> {
+        &self.root_scene
     }
 
     pub fn add_plugin<T: Plugin>(&mut self, mut plugin: T) -> KResult<&mut Self> {

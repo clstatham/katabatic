@@ -1,36 +1,139 @@
-use std::sync::Arc;
-
-use generational_arena::Index;
+use katabatic_ecs::{component::Component, entity::Entity, world::World};
+use katabatic_util::lock::SharedLock;
 use petgraph::prelude::*;
 
-use crate::{id::Id, node::Node, world::World};
+use crate::{
+    node::Node,
+    relationship::{Relationship, RelationshipConnection},
+};
 
-#[derive(Debug)]
 pub struct Scene {
-    pub(crate) world: Arc<World>,
-    pub(crate) graph: StableDiGraph<Index, ()>,
+    world: SharedLock<World>,
+    root_entity: Entity,
+    root: NodeIndex,
+    graph: StableDiGraph<Node, RelationshipConnection>,
 }
 
 impl Scene {
-    pub fn new(world: Arc<World>) -> Self {
+    pub fn new(world: SharedLock<World>) -> Self {
+        let root_entity = world.write().create_entity();
+        let mut graph: StableGraph<Node, RelationshipConnection> = StableDiGraph::new();
+        let root = graph.add_node(Node {
+            entity: root_entity,
+            scene_index: NodeIndex::new(0),
+        });
+        graph[root].scene_index = root;
         Self {
             world,
-            graph: StableGraph::new(),
+            root_entity,
+            root,
+            graph,
         }
     }
 
-    pub fn add_node(&mut self, node: Node) -> Id {
-        let node_id = self.world.insert_node(node);
+    pub fn world(&self) -> &SharedLock<World> {
+        &self.world
+    }
 
-        let scene_index = self.graph.add_node(node_id);
+    pub fn root_entity(&self) -> Entity {
+        self.root_entity
+    }
 
-        Id {
-            node_id,
-            scene_index,
+    pub fn root(&self) -> &Node {
+        &self.graph[self.root]
+    }
+
+    pub fn graph(&self) -> &StableDiGraph<Node, RelationshipConnection> {
+        &self.graph
+    }
+
+    pub fn graph_mut(&mut self) -> &mut StableDiGraph<Node, RelationshipConnection> {
+        &mut self.graph
+    }
+
+    pub fn create_node(&mut self) -> Node {
+        let entity = self.world.write().create_entity();
+        self.add_node(entity)
+    }
+
+    pub fn create_node_with<T: Component>(&mut self, component: T) -> Node {
+        let entity = self.world.write().create_entity();
+        self.world.write().insert_component(entity, component);
+        self.add_node(entity)
+    }
+
+    pub fn add_node(&mut self, entity: Entity) -> Node {
+        let node = self.graph.add_node(Node {
+            entity,
+            scene_index: NodeIndex::new(0),
+        });
+        self.graph[node].scene_index = node;
+        self.graph[node]
+    }
+
+    pub fn add_relationship<T: Relationship>(&mut self, from: Node, to: Node, weight: T) {
+        let from = from.scene_index;
+        let to = to.scene_index;
+        let connection = RelationshipConnection::new(self.graph[from], self.graph[to], weight);
+        self.graph.add_edge(from, to, connection);
+    }
+
+    pub fn remove_node(&mut self, node: Node) {
+        self.graph.remove_node(node.scene_index);
+    }
+
+    pub fn remove_relationship(&mut self, from: Node, to: Node) -> Option<Box<dyn Relationship>> {
+        let from = from.scene_index;
+        let to = to.scene_index;
+        if let Some(edge) = self.graph.find_edge(from, to) {
+            let connection = self.graph.remove_edge(edge)?;
+            Some(connection.weight)
+        } else {
+            None
         }
     }
 
-    pub fn add_edge(&mut self, a: NodeIndex, b: NodeIndex) -> EdgeIndex {
-        self.graph.add_edge(a, b, ())
+    pub fn find_node(&self, entity: Entity) -> Option<Node> {
+        self.graph
+            .node_indices()
+            .find(|&node| self.graph[node].entity == entity)
+            .map(|node| self.graph[node])
+    }
+
+    pub fn children_of(&self, node: Node) -> impl Iterator<Item = Node> + '_ {
+        self.graph
+            .neighbors_directed(node.scene_index, Direction::Outgoing)
+            .map(|node| self.graph[node])
+    }
+
+    pub fn parent_of(&self, node: Node) -> Option<Node> {
+        self.graph
+            .neighbors_directed(node.scene_index, Direction::Incoming)
+            .map(|node| self.graph[node])
+            .next()
+    }
+
+    pub fn siblings_of(&self, node: Node) -> Option<impl Iterator<Item = Node> + '_> {
+        let parent = self.parent_of(node)?;
+        Some(
+            self.children_of(parent)
+                .filter(move |sibling| *sibling != node),
+        )
+    }
+
+    pub fn child_relationships_of(
+        &self,
+        node: Node,
+    ) -> impl Iterator<Item = &dyn Relationship> + '_ {
+        self.graph
+            .edges_directed(node.scene_index, Direction::Outgoing)
+            .map(move |edge| &*edge.weight().weight)
+    }
+
+    pub fn parent_relationship_of(&self, node: Node) -> Option<&dyn Relationship> {
+        self.graph
+            .edges_directed(node.scene_index, Direction::Incoming)
+            .map(move |edge| &*edge.weight().weight)
+            .next()
     }
 }

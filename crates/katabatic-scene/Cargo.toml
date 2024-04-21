@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-generational-arena = "0.2.9"
 katabatic-util = { path = "../katabatic-util" }
+katabatic-ecs = { path = "../katabatic-ecs" }
 petgraph = "0.6.4"

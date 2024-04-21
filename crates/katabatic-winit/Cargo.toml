@@ -10,3 +10,4 @@ winit = "0.28"
 katabatic-core = { path = "../katabatic-core" }
 katabatic-util = { path = "../katabatic-util" }
 katabatic-scene = { path = "../katabatic-scene" }
+katabatic-ecs = { path = "../katabatic-ecs" }

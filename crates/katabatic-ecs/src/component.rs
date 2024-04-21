@@ -4,7 +4,7 @@ pub trait Component: 'static {
     fn as_any_box(self: Box<Self>) -> Box<dyn std::any::Any>;
 }
 
-impl<T: Clone + 'static> Component for T {
+impl<T: 'static> Component for T {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
